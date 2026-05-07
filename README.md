@@ -2,7 +2,9 @@
 
 A multi-agent future-self simulator. Ask a life-decision question and six AI agents explore what could happen — the upside, the risks, the pragmatic middle, and what life looks like if nothing changes.
 
-Built with [AG2 Beta](https://docs.ag2.ai/latest/docs/beta/motivation/) (agent orchestration), [Gemini 2.5](https://openrouter.ai/) (via OpenRouter), [Next.js](https://nextjs.org/), and [CopilotKit](https://www.copilotkit.ai/).
+**Live app:** https://future-me-phi.vercel.app
+
+Built with [AG2 Beta](https://docs.ag2.ai/latest/docs/beta/motivation/) (agent orchestration), [Gemini 2.5](https://openrouter.ai/) (via OpenRouter), [Next.js](https://nextjs.org/), and [CopilotKit](https://www.copilotkit.ai/). Deployed with the frontend on Vercel and the backend on Render.
 
 ## How It Works
 
@@ -99,6 +101,43 @@ frontend/src/
 ├── components/            # UI panels and responsive pipeline wrappers
 └── types.ts               # TypeScript types matching backend models
 ```
+
+## Deployment
+
+The app is split across two services. Both deploy automatically from `main` on push.
+
+### Backend → Render
+
+Render Web Service connected to the GitHub repo. Root directory left blank (uses repo root where `pyproject.toml` lives).
+
+| Setting | Value |
+|---|---|
+| Runtime | Python 3 |
+| Build command | `pip install -e .` |
+| Start command | `uvicorn backend.server:app --host 0.0.0.0 --port $PORT` |
+
+Environment variables on Render:
+
+| Name | Value |
+|---|---|
+| `OPENROUTER_API_KEY` | your OpenRouter key |
+| `CORS_ORIGINS` | `http://localhost:3000,https://future-me-phi.vercel.app` (no trailing slashes — must match the browser's `Origin` header byte-for-byte) |
+
+Render's free tier sleeps after 15 minutes of inactivity; the first request takes ~30 seconds to wake the service.
+
+### Frontend → Vercel
+
+Vercel project connected to the GitHub repo with **Root Directory** set to `frontend/` (the Next.js app lives in a subfolder). Framework auto-detects as Next.js; build/output commands stay at defaults. **Deployment Protection** is turned off so the production URL is publicly reachable.
+
+Environment variables on Vercel:
+
+| Name | Value | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_BACKEND_URL` | the Render URL (e.g. `https://futureme-backend-mtht.onrender.com`) | The `NEXT_PUBLIC_` prefix is required so the value is embedded in the browser bundle. Baked in at **build time** — changing the value requires a redeploy. |
+
+### How the two halves connect
+
+The frontend hits `/healthz` on the backend at mount as a connectivity check, and streams the agent pipeline over `/chat` (Server-Sent Events). For the browser to be allowed to make those calls cross-origin, the backend's `CORS_ORIGINS` must list the exact Vercel origin (scheme + host, no trailing slash) — FastAPI's CORS middleware does an exact-match comparison against the `Origin` header.
 
 ## Safety
 
